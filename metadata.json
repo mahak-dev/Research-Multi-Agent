@@ -1,0 +1,5 @@
+{
+  "name": "Research Agent",
+  "description": "An AI-powered application that assists users by finding, summarizing, and explaining research papers, and even helps in ideating for new research. It features multiple agents for a comprehensive research workflow.",
+  "requestFramePermissions": []
+}

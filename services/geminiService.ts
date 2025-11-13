@@ -1,6 +1,7 @@
 
 
-import { GoogleGenAI, Modality, Type } from "@google/genai";
+
+import { GoogleGenAI, Modality, Type, Chat } from "@google/genai";
 import { ResearchPaper, PaperSummary } from '../types';
 
 const getAiClient = () => new GoogleGenAI({ apiKey: process.env.API_KEY as string });
@@ -56,13 +57,31 @@ export const summarizeAndRatePapers = async (papers: ResearchPaper[]): Promise<P
     return JSON.parse(jsonText);
 };
 
+export const startChat = (paperSummary: PaperSummary): Chat => {
+    const ai = getAiClient();
+    const chat = ai.chats.create({
+        model: "gemini-2.5-pro",
+        config: {
+            systemInstruction: `You are a friendly and knowledgeable research assistant. Your goal is to help the user understand a research paper.
+You have already provided the following summary for the paper titled "${paperSummary.title}":
+"${paperSummary.summary}"
+Now, the user will ask you follow-up questions. Answer them clearly and concisely based on the context of the paper summary. If a question goes beyond the scope of the summary, state that you don't have enough information from the provided text but can make a reasonable inference if appropriate.`,
+        },
+    });
+    return chat;
+};
+
+export const continueChat = async (chat: Chat, message: string): Promise<string> => {
+    const response = await chat.sendMessage({ message });
+    return response.text;
+};
+
 export const generateAudioExplanation = async (text: string): Promise<string> => {
     const ai = getAiClient();
     const response = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text: `In a clear, academic tone, please explain the following: ${text}` }] }],
+        contents: [{ parts: [{ text: `In a clear, friendly tone, say the following: ${text}` }] }],
         config: {
-            // FIX: Use Modality.AUDIO enum for responseModalities.
             responseModalities: [Modality.AUDIO],
             speechConfig: {
                 voiceConfig: {
@@ -84,7 +103,17 @@ export const generateNewPaperHints = async (context: string): Promise<string> =>
     const ai = getAiClient();
     const response = await ai.models.generateContent({
         model: "gemini-2.5-pro",
-        contents: `You are a brilliant research scientist and advisor. Based on the following research context, identify potential research gaps, suggest 3-5 novel research questions, and provide actionable hints for writing a new, innovative research paper. Format your response in markdown. \n\nContext:\n${context}`,
+        contents: `You are a brilliant research scientist and advisor. Based on the following research context, provide the following in markdown format:
+
+First, a section with the title "### New Research Ideas". In this section, identify potential research gaps, suggest 3-5 novel research questions, and provide actionable hints for writing a new, innovative research paper.
+
+Second, a section with the title "### Upcoming Conferences". In this section, find 3-5 relevant, upcoming academic conferences related to the original topic. For each conference, provide its name as a bolded link, its dates, and its location (e.g., *   **[Conference Name](URL)** - Dates, Location.).
+
+Context:
+${context}`,
+        config: {
+            tools: [{ googleSearch: {} }],
+        }
     });
     return response.text;
 };
